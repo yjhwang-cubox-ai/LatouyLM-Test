@@ -5,3 +5,4 @@ configuration = LayoutLMv2Config()
 model = LayoutLMv2Model(config=configuration)
 
 configuration = model.config
+print(configuration)

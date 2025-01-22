@@ -19,6 +19,14 @@
             "program": "model.py",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "inference",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "inference.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
