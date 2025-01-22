@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "finetuning",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "finetuning.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "processor",
             "type": "debugpy",
             "request": "launch",
@@ -25,6 +33,14 @@
             "type": "debugpy",
             "request": "launch",
             "program": "inference.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "sequence_classification",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "sequence_classification.py",
             "console": "integratedTerminal",
             "justMyCode": false
         }
