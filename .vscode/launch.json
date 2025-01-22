@@ -5,11 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "main",
+            "name": "processor",
             "type": "debugpy",
             "request": "launch",
-            "program": "main.py",
-            "console": "integratedTerminal"
+            "program": "processor.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "model.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
