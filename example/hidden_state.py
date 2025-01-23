@@ -10,7 +10,8 @@ processor = LayoutLMv2Processor.from_pretrained("microsoft/layoutlmv2-base-uncas
 model = LayoutLMv2Model.from_pretrained("microsoft/layoutlmv2-base-uncased")
 
 dataset = load_dataset("hf-internal-testing/fixtures_docvqa", trust_remote_code=True)
-image_path = dataset["test"][0]["file"]
+# image_path = dataset["test"][0]["file"]
+image_path = 'testing.png'
 image = Image.open(image_path).convert("RGB")
 
 encoding = processor(image, return_tensors="pt")
