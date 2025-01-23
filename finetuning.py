@@ -108,8 +108,8 @@ class FunsdTrainer(Trainer):
       return test_dataloader
 
 args = TrainingArguments(
-    output_dir="layoutlmv2-finetuned-funsd-v2", # name of directory to store the checkpoints
-    max_steps=1000, # we train for a maximum of 1,000 batches
+    output_dir="layoutlmv2-finetuned-funsd-v2-0123", # name of directory to store the checkpoints
+    max_steps=2000, # we train for a maximum of 1,000 batches
     warmup_ratio=0.1, # we warmup a bit
     fp16=True, # we use mixed precision (less memory consumption)
     push_to_hub=False # after training, we'd like to push our model to the hub
@@ -118,7 +118,7 @@ args = TrainingArguments(
 trainer = FunsdTrainer(
     model=model,
     args=args,
-    compute_metrics=compute_metrics,
+    compute_metrics=compute_metrics
 )
 
 trainer.train()
