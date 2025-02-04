@@ -202,7 +202,9 @@ def main():
     predictor = DocumentPredictor(model_path='model_0204')
 
     # OCR 결과
-    with open('id_00315.json', 'r', encoding='utf-8') as f:
+    data_path = 'TESTSET'
+
+    with open(os.path.join(data_path, '00003132.json'), 'r', encoding='utf-8') as f:
         ocr_result = json.load(f)
     
     image_path = ocr_result['id']
@@ -210,14 +212,12 @@ def main():
     boxes = [data['box'] for data in ocr_result['entities']]
 
     # 예측
-    results = predictor.predict(image_path=image_path, words=words, boxes=boxes)
+    results = predictor.predict(image_path=os.path.join(data_path, image_path), words=words, boxes=boxes)
     
     # 결과 출력
     print("예측 결과:")
     for entity_type, text in results.items():
         print(f"{entity_type}: {text}")
-
-
 
 
 if __name__ == "__main__":
