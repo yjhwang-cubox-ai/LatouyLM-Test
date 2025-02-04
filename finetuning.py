@@ -53,6 +53,9 @@ test_dataloader = DataLoader(test_dataset, batch_size=2)
 
 batch = next(iter(train_dataloader))
 
+for key, value in batch.items():
+    print(f"{key}: {value.shape}")
+
 model = LayoutLMv2ForTokenClassification.from_pretrained('microsoft/layoutlmv2-base-uncased',
                                                                       num_labels=len(label2id))
 

@@ -44,7 +44,7 @@ def load_funsd_dataset(base_dir):
                 data['image_paths'].append(image_path)
                 data['words'].append(words)
                 data['bboxes'].append(boxes)
-                data['ner_tags'].append(labels)
+                data['ner_tags'].append(labels) 
         
         return data
     

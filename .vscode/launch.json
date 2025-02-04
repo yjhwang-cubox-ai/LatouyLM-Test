@@ -5,42 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "finetuning",
+            "name": "finetuning-kr",
             "type": "debugpy",
             "request": "launch",
-            "program": "finetuning.py",
+            "program": "finetuning_kr.py",
             "console": "integratedTerminal",
             "justMyCode": false
         },
         {
-            "name": "processor",
+            "name": "predictor",
             "type": "debugpy",
             "request": "launch",
-            "program": "processor.py",
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "model",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "model.py",
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "inference",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "inference.py",
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "sequence_classification",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "sequence_classification.py",
+            "program": "predictor.py",
             "console": "integratedTerminal",
             "justMyCode": false
         }

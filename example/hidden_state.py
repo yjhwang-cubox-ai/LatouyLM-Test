@@ -9,9 +9,8 @@ set_seed(0)
 processor = LayoutLMv2Processor.from_pretrained("microsoft/layoutlmv2-base-uncased")
 model = LayoutLMv2Model.from_pretrained("microsoft/layoutlmv2-base-uncased")
 
-dataset = load_dataset("hf-internal-testing/fixtures_docvqa", trust_remote_code=True)
-# image_path = dataset["test"][0]["file"]
-image_path = 'testing.png'
+dataset = load_dataset("nielsr/funsd", trust_remote_code=True)
+image_path = dataset["test"][0]["image_path"]
 image = Image.open(image_path).convert("RGB")
 
 encoding = processor(image, return_tensors="pt")

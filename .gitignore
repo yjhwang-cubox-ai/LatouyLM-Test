@@ -2,6 +2,11 @@ __pycache__
 layoutlmv2-finetuned-funsd-v2
 layoutlmv2-finetuned-funsd-v2-0123
 layoutlmv2-finetuned-funsd-v2-0124
-images
-KR_ID_LAYOUT_TRAIN
-output_predictions
+# images
+# KR_ID_LAYOUT_TRAIN
+# output_predictions
+*.json
+*.jpg
+*.png
+*.safetensors
+*.txt
