@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 import torch
+from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
     LayoutLMv2ForTokenClassification,
@@ -45,6 +46,11 @@ class KoreanDocumentDataset(Dataset):
         self.max_length = max_length
         self.label_map = label_map or self._create_label_map()
 
+        self.image_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor()
+        ])
+
     def _create_label_map(self) -> Dict[str, int]:
         # 모든 예제에서 고유한 레이블 수집
         unique_labels = set()
@@ -71,6 +77,7 @@ class KoreanDocumentDataset(Dataset):
         # 이미지 로드 및 전처리
         image = Image.open(example.image_path).convert("RGB")
         width, height = image.size
+        image_tensor = self.image_transform(image)
 
         # 엔티티들을 텍스트 순서대로 정렬 (top-to-bottom, left-to-right)
         sorted_entities = sorted(
@@ -88,6 +95,7 @@ class KoreanDocumentDataset(Dataset):
             labels.append(self.label_map[entity.label])
 
         normalized_boxes = [self.normalize_bbox(box, width, height) for box in boxes]
+        # print(f"Normalized boxes: {normalized_boxes}")
 
         # 토큰화
         tokenized = self.tokenizer(
@@ -101,6 +109,7 @@ class KoreanDocumentDataset(Dataset):
 
         # token to word index 매핑으로 bbox와 label 조정
         word_ids = tokenized.word_ids()
+
         bbox_inputs = []
         label_inputs = []
 
@@ -112,13 +121,19 @@ class KoreanDocumentDataset(Dataset):
                 bbox_inputs.append(normalized_boxes[word_id])
                 label_inputs.append(labels[word_id])
 
+        for box in bbox_inputs:
+            if not all(0 <= coord <= 1000 for coord in box):
+                print(f"Warning: Invalid bbox coordinates: {box}")
+                # 문제가 있는 좌표를 0~1000 범위로 클리핑
+                box = [min(max(coord, 0), 1000) for coord in box]
+
         encoding = {
             "input_ids": tokenized["input_ids"].squeeze(0),            
             "token_type_ids": tokenized["token_type_ids"].squeeze(0),
             "attention_mask": tokenized["attention_mask"].squeeze(0),
             "bbox": torch.tensor(bbox_inputs),            
             "labels": torch.tensor(label_inputs),
-            "image": image
+            "image": image_tensor
         }
 
         return encoding
@@ -157,81 +172,87 @@ def load_dataset(data_dir: str) -> List[DocumentExample]:
     
     return examples
 
-# def train_model(
-#     model: LayoutLMv2ForTokenClassification,
-#     train_dataloader: DataLoader,
-#     val_dataloader: DataLoader,
-#     num_epochs: int,
-#     device: torch.device,
-#     learning_rate: float = 2e-5,
-# ) -> None:
-#     optimizer = AdamW(model.parameters(), lr=learning_rate)
-#     total_steps = len(train_dataloader) * num_epochs
-#     scheduler = get_linear_schedule_with_warmup(
-#         optimizer,
-#         num_warmup_steps=0,
-#         num_training_steps=total_steps
-#     )
+def train_model(
+    model: LayoutLMv2ForTokenClassification,
+    train_dataloader: DataLoader,
+    val_dataloader: DataLoader,
+    num_epochs: int,
+    device: torch.device,
+    learning_rate: float = 2e-5,
+) -> None:
+    optimizer = AdamW(model.parameters(), lr=learning_rate)
+    total_steps = len(train_dataloader) * num_epochs
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=0,
+        num_training_steps=total_steps
+    )
 
-#     model.to(device)
+    model.to(device)
     
-#     for epoch in range(num_epochs):
-#         print(f"Epoch {epoch + 1}/{num_epochs}")
+    for epoch in range(num_epochs):
+        print(f"Epoch {epoch + 1}/{num_epochs}")
         
-#         # Training
-#         model.train()
-#         total_loss = 0
+        # Training
+        model.train()
+        total_loss = 0
         
-#         for batch in train_dataloader:
-#             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-#                     for k, v in batch.items()}
+        for batch in train_dataloader:
+            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                    for k, v in batch.items()}
             
-#             outputs = model(**batch)
-#             loss = outputs.loss
+            outputs = model(**batch)
+            loss = outputs.loss
+            print(f"loss: {loss}")
             
-#             loss.backward()
-#             optimizer.step()
-#             scheduler.step()
-#             optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
             
-#             total_loss += loss.item()
+            total_loss += loss.item()
         
-#         avg_train_loss = total_loss / len(train_dataloader)
-#         print(f"Average training loss: {avg_train_loss:.4f}")
+        print("="*100)
         
-#         # Validation
-#         model.eval()
-#         val_loss = 0
-#         predictions = []
-#         true_labels = []
+        avg_train_loss = total_loss / len(train_dataloader)
+        print(f"Average training loss: {avg_train_loss:.4f}")
         
-#         with torch.no_grad():
-#             for batch in val_dataloader:
-#                 batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-#                         for k, v in batch.items()}
+        # Validation
+        model.eval()
+        val_loss = 0
+        predictions = []
+        true_labels = []
+        
+        with torch.no_grad():
+            for batch in val_dataloader:
+                batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                        for k, v in batch.items()}
                 
-#                 outputs = model(**batch)
-#                 val_loss += outputs.loss.item()
+                outputs = model(**batch)
+                val_loss += outputs.loss.item()
                 
-#                 logits = outputs.logits
-#                 pred = torch.argmax(logits, dim=2)
+                logits = outputs.logits
+                pred = torch.argmax(logits, dim=2)
                 
-#                 # Mask out padding tokens
-#                 mask = batch["labels"] != -100
-#                 predictions.extend(pred[mask].cpu().numpy())
-#                 true_labels.extend(batch["labels"][mask].cpu().numpy())
+                # Mask out padding tokens
+                mask = batch["labels"] != -100
+                predictions.extend(pred[mask].cpu().numpy())
+                true_labels.extend(batch["labels"][mask].cpu().numpy())
         
-#         avg_val_loss = val_loss / len(val_dataloader)
-#         print(f"Validation loss: {avg_val_loss:.4f}")
+        avg_val_loss = val_loss / len(val_dataloader)
+        print(f"Validation loss: {avg_val_loss:.4f}")
         
-#         # Print classification report
-#         print("\nClassification Report:")
-#         print(classification_report(true_labels, predictions))
+        # Print classification report
+        print("\nClassification Report:")
+        print(classification_report(true_labels, predictions))
 
 def main():
-    DATA_DIR = "KR_ID_LAYOUT_TRAIN"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
+    DATA_DIR = "/data/KR_ID_LAYOUT_TRAIN_V2"
     TOKENIZER_NAME = "klue/bert-base"  # 한국어 BERT 토크나이저
-    BATCH_SIZE = 1
+    BATCH_SIZE = 16
     NUM_EPOCHS = 5
     MAX_LENGTH = 512
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -259,49 +280,48 @@ def main():
         label_map=train_dataset.label_map  # 학습 데이터의 레이블 맵 재사용
     )
 
-    print(train_dataset[0])
-
     # 레이블 개수 설정
     num_labels = len(train_dataset.label_map)
     
-    # # 모델 로드
-    # model = LayoutLMv2ForTokenClassification.from_pretrained(
-    #     "microsoft/layoutlmv2-base-uncased",
-    #     num_labels=num_labels
-    # )
+    # 모델 로드
+    model = LayoutLMv2ForTokenClassification.from_pretrained(
+        "microsoft/layoutlmv2-base-uncased",
+        num_labels=num_labels
+    )
+    model.resize_token_embeddings(len(tokenizer))
 
-    # # DataLoader 생성
-    # train_dataloader = DataLoader(
-    #     train_dataset,
-    #     batch_size=BATCH_SIZE,
-    #     shuffle=True,
-    #     num_workers=2
-    # )
-    # val_dataloader = DataLoader(
-    #     val_dataset,
-    #     batch_size=BATCH_SIZE,
-    #     shuffle=False,
-    #     num_workers=2
-    # )
+    # DataLoader 생성
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=0
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
+        num_workers=0
+    )
 
-    # # 모델 학습
-    # train_model(
-    #     model=model,
-    #     train_dataloader=train_dataloader,
-    #     val_dataloader=val_dataloader,
-    #     num_epochs=NUM_EPOCHS,
-    #     device=DEVICE
-    # )
+    # 모델 학습
+    train_model(
+        model=model,
+        train_dataloader=train_dataloader,
+        val_dataloader=val_dataloader,
+        num_epochs=NUM_EPOCHS,
+        device=DEVICE
+    )
 
-    # # 모델과 레이블 맵 저장
-    # output_dir = "path/to/save/model"
-    # os.makedirs(output_dir, exist_ok=True)
-    # model.save_pretrained(output_dir)
-    # tokenizer.save_pretrained(output_dir)
+    # 모델과 레이블 맵 저장
+    output_dir = "output!!!!!!!!!!"
+    os.makedirs(output_dir, exist_ok=True)
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
     
-    # # 레이블 맵 저장
-    # with open(os.path.join(output_dir, "label_map.json"), "w", encoding="utf-8") as f:
-    #     json.dump(train_dataset.label_map, f, ensure_ascii=False, indent=2)
+    # 레이블 맵 저장
+    with open(os.path.join(output_dir, "label_map.json"), "w", encoding="utf-8") as f:
+        json.dump(train_dataset.label_map, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     main()
