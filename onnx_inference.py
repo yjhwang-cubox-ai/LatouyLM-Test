@@ -131,73 +131,86 @@ class LayoutLMv2ONNX:
         return results
 
 
-    def predict(self, image_path, texts, bboxes):
-        texts, bboxes = self._sort_by_reading_order(texts, bboxes)        
-        image = Image.open(image_path).convert('RGB')
-        width, height = image.size
+    def predict(self, image_paths, texts, bboxes):
+        if isinstance(image_paths, str):
+            image_paths = [image_paths]
+            texts = [texts]
+            bboxes = [bboxes]
+        
+        batch_size = len(image_paths)
+        all_sorted_texts, all_normalized_boxes, images = [], [], []
 
-        # 텍스트 처리
+        for i in range(batch_size):
+            sorted_texts, sorted_boxes = self._sort_by_reading_order(texts[i], bboxes[i])
+            all_sorted_texts.append(sorted_texts)
+
+            image = Image.open(image_paths[i]).convert('RGB')
+            width, height = image.size
+            normalized_boxes = [self.normalize_bbox(box, width, height) for box in sorted_boxes]
+            all_normalized_boxes.append(normalized_boxes)
+
+            resized = image.resize((224, 224), Image.LANCZOS)
+            img_arr = np.array(resized).transpose(2,0,1).astype(np.float32)
+            images.append(img_arr)
+        
         encoding = self.tokenizer(
-            texts,
+            all_sorted_texts,
             return_tensors="np",
             padding="max_length",
             truncation=True,
             is_split_into_words=True,
             max_length=512
         )
-        input_ids = encoding['input_ids']
-        attention_mask = encoding['attention_mask']
-        token_type_ids = encoding["token_type_ids"]
 
-        word_ids = encoding.word_ids()
-
-        # bbox 처리
-        normalized_boxes = [self.normalize_bbox(box, width, height) for box in bboxes]
-
-        bbox_inputs = []
-        for word_id in word_ids:
-            if word_id is None:
-                bbox_inputs.append([0, 0, 0, 0])
-            else:
-                bbox_inputs.append(normalized_boxes[word_id])
-        
-        bbox_inputs = [
-            [min(max(coord, 0), 1000) for coord in box]
-            for box in bbox_inputs
-        ]
-        
-        bboxes = np.expand_dims(np.array(bbox_inputs, dtype=np.int64), axis=0)
-        resized_image = np.array(image.resize((224, 224), Image.LANCZOS))
-        resized_image = resized_image.transpose(2,0,1)
-        resized_image = np.expand_dims(resized_image, axis=0)
-        resized_image = resized_image.astype(np.float32)
+        batch_bbox = []
+        for i in range(batch_size):
+            word_ids = encoding.word_ids(batch_index=i)
+            sample_bbox = []
+            for word_id in word_ids:
+                if word_id is None:
+                    sample_bbox.append([0, 0, 0, 0])
+                else:
+                    sample_bbox.append(all_normalized_boxes[i][word_id])
+            # 좌표 클리핑
+            sample_bbox = [[min(max(coord, 0), 1000) for coord in box] for box in sample_bbox]
+            batch_bbox.append(sample_bbox)
 
         inputs = {
-            "input_ids": input_ids,
-            "bbox": bboxes,
-            "image": resized_image,
-            "attention_mask": attention_mask,
-            "token_type_ids": token_type_ids
+            "input_ids": encoding["input_ids"],
+            "bbox": np.array(batch_bbox, dtype=np.int64),
+            "image": np.stack(images, axis=0),
+            "attention_mask": encoding["attention_mask"],
+            "token_type_ids": encoding["token_type_ids"]
         }
 
         outputs = self.session.run(None, inputs)
-        logits = outputs[0].argmax(-1)
-
-        return self.postprocess(logits=logits[0], words=texts, word_ids=word_ids)
+        logits = outputs[0].argmax(-1)  # shape: (batch_size, seq_length)
+        
+        results = []
+        for i in range(batch_size):
+            word_ids = encoding.word_ids(batch_index=i)
+            sample_result = self.postprocess(logits[i], all_sorted_texts[i], word_ids)
+            results.append(sample_result)
+        
+        return results[0] if batch_size == 1 else results
 
 def main():
     model = LayoutLMv2ONNX('layoutlmv2.onnx')
 
     # OCR 결과
-    data_path = 'TESTSET'
-    with open(os.path.join(data_path, '00003132.json'), 'r', encoding='utf-8') as f:
-        ocr_result = json.load(f)
-    
-    image_path = os.path.join(data_path, ocr_result['id'])
-    words = [data['text'] for data in ocr_result['entities']]
-    boxes = [data['box'] for data in ocr_result['entities']]
+    data_path = 'TESTSET2'
 
-    results = model.predict(image_path=image_path, texts=words, bboxes=boxes)
+    image_paths, words, boxes = [], [], []
+    anno_path, img_path = os.path.join(data_path, 'annotations'), os.path.join(data_path, 'images')
+    anno_files = os.listdir(anno_path)
+    for anno_file in anno_files:
+        with open(os.path.join(anno_path, anno_file), 'r', encoding='utf-8') as f:
+            ocr_result = json.load(f)
+        image_paths.append(os.path.join(img_path, ocr_result['id']))
+        words.append([data['text'] for data in ocr_result['entities']])
+        boxes.append([data['box'] for data in ocr_result['entities']])
+
+    results = model.predict(image_paths=image_paths, texts=words, bboxes=boxes)
 
     print(results)
 
