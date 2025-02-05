@@ -194,9 +194,6 @@ class DocumentPredictor:
             
         return results
 
-
-
-
 def main():
     # 모델 초기화
     predictor = DocumentPredictor(model_path='model_0204')

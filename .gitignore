@@ -10,3 +10,4 @@ layoutlmv2-finetuned-funsd-v2-0124
 *.png
 *.safetensors
 *.txt
+*.onnx

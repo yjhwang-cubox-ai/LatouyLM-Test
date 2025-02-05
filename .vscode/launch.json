@@ -19,6 +19,30 @@
             "program": "predictor.py",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "convert_to_onnx",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "convert_to_onnx.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "test.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "onnx-infer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "onnx_inference.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

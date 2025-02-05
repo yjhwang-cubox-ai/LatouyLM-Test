@@ -198,7 +198,7 @@ def main():
     model = LayoutLMv2ONNX('layoutlmv2.onnx')
 
     # OCR 결과
-    data_path = 'TESTSET2'
+    data_path = 'TESTSET'
 
     image_paths, words, boxes = [], [], []
     anno_path, img_path = os.path.join(data_path, 'annotations'), os.path.join(data_path, 'images')
